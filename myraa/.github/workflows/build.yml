@@ -15,13 +15,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Locate MYRAA project files
+        run: |
+          echo "Repository root:"
+          pwd
+          echo "Searching for project files..."
+          find . -maxdepth 6 -type f \( \
+            -name "myraa.py" -o \
+            -name "settings.gradle.kts" -o \
+            -name "build.gradle.kts" -o \
+            -name "gradlew" \
+          \) -print
+
+      - name: Detect project directory
+        id: project
+        shell: bash
+        run: |
+          if [ -f "myraa/myraa.py" ] && [ -f "myraa/settings.gradle.kts" ]; then
+            echo "dir=myraa" >> "$GITHUB_OUTPUT"
+          elif [ -f "myraa.py" ] && [ -f "settings.gradle.kts" ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not locate myraa.py and settings.gradle.kts in the expected project directories."
+            exit 1
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Backend self-test
-        working-directory: myraa
+        working-directory: ${{ steps.project.outputs.dir }}
         run: python myraa.py test
 
       - name: Set up Java
@@ -39,28 +64,12 @@ jobs:
           gradle-version: "8.7"
 
       - name: Build debug APK
-        working-directory: myraa
+        working-directory: ${{ steps.project.outputs.dir }}
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: myraa-debug-apk
-          path: myraa/app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-
-      - name: Generate Gradle wrapper
-        working-directory: myraa
-        continue-on-error: true
-        run: gradle wrapper --gradle-version 8.7
-
-      - name: Upload Gradle wrapper files
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-wrapper-files
-          path: |
-            myraa/gradlew
-            myraa/gradlew.bat
-            myraa/gradle/wrapper/*
-          if-no-files-found: warn
