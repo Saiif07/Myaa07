@@ -15,21 +15,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Locate project
+      - name: Find project directory
         id: project
         shell: bash
         run: |
-          find . -maxdepth 6 -type f \( \
-            -name "myraa.py" -o \
-            -name "settings.gradle.kts" \
-          \) -print
+          find . -maxdepth 6 -type f \( -name "myraa.py" -o -name "settings.gradle.kts" \)
 
           if [ -f "myraa/myraa.py" ] && [ -f "myraa/settings.gradle.kts" ]; then
             echo "dir=myraa" >> "$GITHUB_OUTPUT"
           elif [ -f "myraa.py" ] && [ -f "settings.gradle.kts" ]; then
             echo "dir=." >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Project files not found."
+            echo "::error::MYRAA project files not found"
             exit 1
           fi
 
@@ -48,10 +45,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
