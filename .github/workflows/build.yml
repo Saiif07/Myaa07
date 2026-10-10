@@ -1,4 +1,4 @@
-name: Build APK
+name: Build MYRAA APK
 
 on:
   push:
@@ -12,22 +12,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Locate MYRAA project
         id: project
         shell: bash
         run: |
-          echo "Searching for MYRAA files..."
-          find . -maxdepth 6 -type f \( -name "myraa.py" -o -name "settings.gradle.kts" \)
+          echo "Repository files:"
+          find . -maxdepth 5 -type f \( \
+            -name "myraa.py" -o \
+            -name "settings.gradle.kts" -o \
+            -name "settings.gradle" \
+          \) -print
 
           if [ -f "myraa/myraa.py" ] && [ -f "myraa/settings.gradle.kts" ]; then
             echo "dir=myraa" >> "$GITHUB_OUTPUT"
+          elif [ -f "myraa/myraa.py" ] && [ -f "myraa/settings.gradle" ]; then
+            echo "dir=myraa" >> "$GITHUB_OUTPUT"
           elif [ -f "myraa.py" ] && [ -f "settings.gradle.kts" ]; then
             echo "dir=." >> "$GITHUB_OUTPUT"
+          elif [ -f "myraa.py" ] && [ -f "settings.gradle" ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
           else
-            echo "::error::MYRAA project files were not found in the expected directories."
+            echo "::error::MYRAA project files were not found in the expected locations."
             exit 1
           fi
 
@@ -36,7 +44,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Backend self-test
+      - name: Test MYRAA backend
         working-directory: ${{ steps.project.outputs.dir }}
         run: python myraa.py test
 
@@ -48,6 +56,16 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          sdkmanager --list_installed
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -58,9 +76,24 @@ jobs:
         working-directory: ${{ steps.project.outputs.dir }}
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
+      - name: Verify APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "::error::APK was not generated at $APK"
+            find app/build/outputs -type f -name "*.apk" -print 2>/dev/null || true
+            exit 1
+          fi
+
+          ls -lh "$APK"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: myraa-debug-apk
-          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          name: MYRAA-debug-APK
+          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
