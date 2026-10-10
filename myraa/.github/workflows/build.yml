@@ -1,0 +1,26 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Backend self-test
+        run: python myraa.py test
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with: { name: myraa-debug-apk, path: app/build/outputs/apk/debug/*.apk }
+      - name: Generate the real Gradle wrapper (commit these files to get the official gradle-wrapper.jar)
+        continue-on-error: true
+        run: gradle wrapper --gradle-version 8.7
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with: { name: gradle-wrapper-files, path: "gradlew\ngradlew.bat\ngradle/wrapper/*" }

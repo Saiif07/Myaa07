@@ -1,0 +1,7 @@
+.env
+*.db
+workspace/
+build/
+.gradle/
+local.properties
+__pycache__/
