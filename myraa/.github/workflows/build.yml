@@ -1,26 +1,66 @@
 name: Build APK
-on: [push, workflow_dispatch]
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Backend self-test
+        working-directory: myraa
         run: python myraa.py test
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: "8.7" }
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
       - name: Build debug APK
+        working-directory: myraa
         run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - uses: actions/upload-artifact@v4
-        with: { name: myraa-debug-apk, path: app/build/outputs/apk/debug/*.apk }
-      - name: Generate the real Gradle wrapper (commit these files to get the official gradle-wrapper.jar)
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: myraa-debug-apk
+          path: myraa/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Generate Gradle wrapper
+        working-directory: myraa
         continue-on-error: true
         run: gradle wrapper --gradle-version 8.7
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload Gradle wrapper files
         continue-on-error: true
-        with: { name: gradle-wrapper-files, path: "gradlew\ngradlew.bat\ngradle/wrapper/*" }
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-wrapper-files
+          path: |
+            myraa/gradlew
+            myraa/gradlew.bat
+            myraa/gradle/wrapper/*
+          if-no-files-found: warn
